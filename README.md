@@ -1,36 +1,162 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sharing Space – Secure Legal Client Portal
 
-## Getting Started
+A **Productised Service** built on top of Microsoft SharePoint and the Microsoft Graph API.
+Designed to give law firms a branded, secure client portal **without migrating away from
+the Microsoft 365 they already pay for**.
 
-First, run the development server:
+Built with **Blazor Server** (.NET 8) and **Microsoft Fluent UI (Office UI Fabric)**.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Blazor Server (.NET 8)  –  Office UI Fabric Fluent UI   │
+│                                                          │
+│  Lawyer Dashboard        Client Dashboard                │
+│  ┌─ Active Cases ─┐      ┌─ My Documents ─┐             │
+│  │  CaseCard grid │      │  Document list  │             │
+│  └────────────────┘      └─────────────────┘             │
+│                                                          │
+│  CaseDetail page: upload files, share secure links       │
+└───────────────────────┬──────────────────────────────────┘
+                        │  Microsoft Graph API (HTTPS)
+                        ▼
+┌──────────────────────────────────────────────────────────┐
+│  Microsoft 365 Tenant                                    │
+│                                                          │
+│  Azure AD / Entra ID          SharePoint Online          │
+│  ┌─ App Registration ─┐      ┌─ Document Libraries ─┐   │
+│  │  Client Credentials│      │  One library per case │   │
+│  │  Sites.ReadWrite   │ ───▶ │  Metadata columns:    │   │
+│  │  Files.ReadWrite   │      │  CaseNumber, Client   │   │
+│  └────────────────────┘      │  Email, Status        │   │
+│                              └───────────────────────┘   │
+│  Entra B2B Guest Access                                  │
+│  ┌─ External users ──────────────────────────────────┐   │
+│  │  Microsoft accounts  →  sign in with credentials  │   │
+│  │  Gmail / other       →  Email One-Time Passcode   │   │
+│  └───────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────┘
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Key Design Decisions
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Concern | Solution |
+|---------|----------|
+| UI framework | Blazor Server + Microsoft Fluent UI (Office UI Fabric) |
+| Authentication | Microsoft Identity Web (OIDC) + Entra B2B guest invitations |
+| File storage | SharePoint Document Libraries (one per case) |
+| API | Microsoft Graph v1.0 via the official .NET SDK |
+| Incremental sync | Graph **delta queries** – only fetches changes since last sync |
+| External clients | Email OTP (no Microsoft licence required) or existing Microsoft account |
+| Security | Least-privilege sharing links, 30-day expiry, sensitivity label ready |
+| GDPR | Files never leave the firm's own Microsoft 365 tenant |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+sharing-space/
+├── SharingSpace.slnx                  # .NET solution
+├── src/
+│   └── SharingSpace.Client/           # Blazor Server app
+│       ├── Components/
+│       │   ├── Layout/
+│       │   │   ├── MainLayout.razor   # Fluent UI shell (header, nav, footer)
+│       │   │   └── NavMenu.razor      # FluentNavMenu with role-based links
+│       │   ├── Pages/
+│       │   │   ├── Home.razor         # Landing page
+│       │   │   ├── LawyerDashboard.razor  # Active Cases (Lawyer role)
+│       │   │   ├── ClientDashboard.razor  # My Documents (Client role)
+│       │   │   └── CaseDetail.razor   # Upload / share / delta sync
+│       │   └── Shared/
+│       │       ├── CaseCard.razor     # Fluent UI card for a case
+│       │       ├── DocumentList.razor # Fluent UI DataGrid for files
+│       │       └── FeatureTile.razor  # Home page feature tiles
+│       ├── Models/
+│       │   ├── Case.cs
+│       │   ├── CaseDocument.cs
+│       │   ├── DeltaSyncState.cs
+│       │   └── UserRole.cs
+│       ├── Services/
+│       │   ├── GraphService.cs        # All Microsoft Graph API calls
+│       │   └── GraphClientFactory.cs  # Client-credentials auth setup
+│       ├── Program.cs
+│       └── appsettings.json
+├── docs/
+│   ├── setup-checklist.md             # IT admin configuration guide
+│   └── how-to-invite-a-client.md      # 3-page staff guide
+└── .env.example                       # Required environment variables
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Quick Start
 
-## Deploy on Vercel
+### Prerequisites
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- .NET 8 SDK
+- A Microsoft 365 tenant with SharePoint Online
+- An Azure AD App Registration (see [`docs/setup-checklist.md`](docs/setup-checklist.md))
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 1. Configure
+
+```bash
+cp .env.example .env
+# Fill in AZURE_AD_TENANT_ID, AZURE_AD_CLIENT_ID, AZURE_AD_CLIENT_SECRET,
+# SHAREPOINT_SITE_ID, etc.
+```
+
+Or edit `src/SharingSpace.Client/appsettings.json` directly.
+
+### 2. Run
+
+```bash
+cd src/SharingSpace.Client
+dotnet run
+```
+
+Open `https://localhost:5001` and sign in with a Microsoft account that has been assigned
+the `Lawyer` or `Client` role in Entra ID.
+
+### 3. Deploy
+
+```bash
+dotnet publish src/SharingSpace.Client -c Release -o ./publish
+# Deploy ./publish to Azure App Service or any HTTPS host
+```
+
+---
+
+## Entra B2B Guest Access
+
+External clients (including Gmail users) do not need a Microsoft 365 licence.
+They receive a **One-Time Passcode** via email every time they sign in.
+
+See [`docs/setup-checklist.md`](docs/setup-checklist.md) for the full Entra ID and
+SharePoint configuration walkthrough.
+
+See [`docs/how-to-invite-a-client.md`](docs/how-to-invite-a-client.md) for the
+lawyer-facing staff guide on inviting clients and sharing documents.
+
+---
+
+## Microsoft Graph Features Used
+
+| Feature | Endpoint | Usage |
+|---------|----------|-------|
+| List drives (cases) | `GET /sites/{id}/drives` | Lawyer dashboard |
+| List drive items | `GET /drives/{id}/root/children` | Document list |
+| **Delta query** | `GET /drives/{id}/root/delta` | Incremental file sync |
+| Upload file | `PUT /drives/{id}/root:/{name}:/content` | Small files ≤ 4 MB |
+| Upload session | `POST /drives/{id}/root:/{name}:/createUploadSession` | Large files |
+| Create sharing link | `POST /drives/{id}/items/{id}/createLink` | Guest access |
+
+---
+
+## Licence
+
+MIT

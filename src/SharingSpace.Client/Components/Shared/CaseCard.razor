@@ -1,0 +1,60 @@
+@* CaseCard.razor – Office UI Fabric Fluent UI card for a single legal case *@
+
+<FluentCard Style="min-width:260px;max-width:320px;padding:20px;cursor:pointer"
+            @onclick="OnClick">
+    <FluentStack Orientation="Orientation.Vertical" Gap="10">
+
+        <FluentStack HorizontalAlignment="HorizontalAlignment.SpaceBetween"
+                     VerticalAlignment="VerticalAlignment.Center">
+            <FluentBadge Appearance="@StatusAppearance" Fill="Filled">
+                @Case.Status
+            </FluentBadge>
+            <FluentIcon Value="@(new Icons.Regular.Size20.Briefcase())"
+                        Color="Color.Accent" />
+        </FluentStack>
+
+        <FluentLabel Typo="Typography.H6" Style="font-weight:600">
+            @Case.Title
+        </FluentLabel>
+
+        <FluentLabel Color="Color.Neutral">
+            <b>Client:</b> @Case.ClientName
+        </FluentLabel>
+
+        <FluentLabel Color="Color.Neutral">
+            <b>Lawyer:</b> @Case.AssignedLawyer
+        </FluentLabel>
+
+        <FluentDivider />
+
+        <FluentStack HorizontalAlignment="HorizontalAlignment.SpaceBetween">
+            <FluentLabel>
+                <FluentIcon Value="@(new Icons.Regular.Size16.Document())" />
+                @Case.DocumentCount file@(Case.DocumentCount == 1 ? "" : "s")
+            </FluentLabel>
+            <FluentLabel Color="Color.Neutral" Style="font-size:12px">
+                @Case.OpenedDate.ToString("dd MMM yyyy")
+            </FluentLabel>
+        </FluentStack>
+
+    </FluentStack>
+</FluentCard>
+
+@code {
+    [Parameter, EditorRequired] public Case Case { get; set; } = default!;
+    [Parameter] public EventCallback<Case> OnSelected { get; set; }
+
+    private Appearance StatusAppearance => Case.Status switch
+    {
+        CaseStatus.Active => Appearance.Accent,
+        CaseStatus.UnderReview => Appearance.Lightweight,
+        CaseStatus.Closed => Appearance.Neutral,
+        _ => Appearance.Neutral
+    };
+
+    private async Task OnClick()
+    {
+        if (OnSelected.HasDelegate)
+            await OnSelected.InvokeAsync(Case);
+    }
+}

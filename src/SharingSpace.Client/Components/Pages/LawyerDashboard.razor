@@ -1,0 +1,125 @@
+@page "/lawyer"
+@attribute [Authorize(Roles = "Lawyer")]
+@layout SharingSpace.Client.Components.Layout.MainLayout
+@inject GraphService Graph
+@inject NavigationManager Nav
+@inject IToastService Toast
+
+<PageTitle>Active Cases – Lawyer Dashboard</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" Gap="24">
+
+    @* ── Header row ────────────────────────────────────────────────────── *@
+    <FluentStack HorizontalAlignment="HorizontalAlignment.SpaceBetween"
+                 VerticalAlignment="VerticalAlignment.Center">
+        <FluentLabel Typo="Typography.H4">
+            <FluentIcon Value="@(new Icons.Regular.Size24.Briefcase())" Color="Color.Accent" />
+            &nbsp;Active Cases
+        </FluentLabel>
+
+        <FluentStack Gap="8">
+            <FluentSearch @bind-Value="_searchTerm"
+                          Placeholder="Search cases…"
+                          Style="width:240px" />
+            <FluentButton Appearance="Appearance.Accent" OnClick="RefreshAsync">
+                <FluentIcon Value="@(new Icons.Regular.Size16.ArrowClockwise())" />
+                &nbsp;Refresh
+            </FluentButton>
+        </FluentStack>
+    </FluentStack>
+
+    @* ── Status filter tabs ────────────────────────────────────────────── *@
+    <FluentTabs>
+        <FluentTab Label="All" Id="all" @onclick='() => _filter = null'>
+            All (@_allCases.Count)
+        </FluentTab>
+        <FluentTab Label="Active" Id="active" @onclick='() => _filter = CaseStatus.Active'>
+            Active (@_allCases.Count(c => c.Status == CaseStatus.Active))
+        </FluentTab>
+        <FluentTab Label="Under Review" Id="review" @onclick='() => _filter = CaseStatus.UnderReview'>
+            Under Review (@_allCases.Count(c => c.Status == CaseStatus.UnderReview))
+        </FluentTab>
+        <FluentTab Label="Closed" Id="closed" @onclick='() => _filter = CaseStatus.Closed'>
+            Closed (@_allCases.Count(c => c.Status == CaseStatus.Closed))
+        </FluentTab>
+    </FluentTabs>
+
+    @* ── Case cards grid ──────────────────────────────────────────────── *@
+    @if (_loading)
+    {
+        <FluentStack HorizontalAlignment="HorizontalAlignment.Center" Style="padding:40px">
+            <FluentProgressRing />
+            <FluentLabel>Loading cases from SharePoint…</FluentLabel>
+        </FluentStack>
+    }
+    else if (!FilteredCases.Any())
+    {
+        <FluentMessageBar Intent="MessageIntent.Info">
+            No cases match your current filter.
+        </FluentMessageBar>
+    }
+    else
+    {
+        <FluentStack Wrap="true" Gap="16">
+            @foreach (var c in FilteredCases)
+            {
+                <CaseCard Case="@c" OnSelected="OpenCase" />
+            }
+        </FluentStack>
+    }
+
+    @* ── Summary stats bar ─────────────────────────────────────────────── *@
+    @if (_allCases.Any())
+    {
+        <FluentDivider />
+        <FluentStack Gap="24">
+            <FluentLabel>Total cases: <b>@_allCases.Count</b></FluentLabel>
+            <FluentLabel>Total documents: <b>@_allCases.Sum(c => c.DocumentCount)</b></FluentLabel>
+            <FluentLabel>
+                Last refreshed: <b>@_lastRefreshed.ToString("HH:mm:ss")</b>
+            </FluentLabel>
+        </FluentStack>
+    }
+
+</FluentStack>
+
+@code {
+    private List<Case> _allCases = [];
+    private string _searchTerm = string.Empty;
+    private CaseStatus? _filter;
+    private bool _loading = true;
+    private DateTime _lastRefreshed = DateTime.Now;
+
+    private IEnumerable<Case> FilteredCases => _allCases
+        .Where(c => _filter is null || c.Status == _filter)
+        .Where(c => string.IsNullOrWhiteSpace(_searchTerm) ||
+                    c.Title.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    c.ClientName.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    c.CaseNumber.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync() => await LoadCasesAsync();
+
+    private async Task RefreshAsync() => await LoadCasesAsync();
+
+    private async Task LoadCasesAsync()
+    {
+        _loading = true;
+        try
+        {
+            var cases = await Graph.GetCasesAsync();
+            _allCases = cases.ToList();
+            _lastRefreshed = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to load cases: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenCase(Case selected) =>
+        Nav.NavigateTo($"/case/{selected.DriveId}");
+}

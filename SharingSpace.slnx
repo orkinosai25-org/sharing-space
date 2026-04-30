@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SharingSpace.Client/SharingSpace.Client.csproj" />
+  </Folder>
+</Solution>

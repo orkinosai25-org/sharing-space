@@ -1,0 +1,27 @@
+/* ── Global portal styles ─────────────────────────────────────────────── */
+html, body {
+    height: 100%;
+    margin: 0;
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    background-color: var(--neutral-layer-1, #f5f5f5);
+}
+
+/* Ensure Fluent UI layout fills the viewport */
+fluent-layout, fluent-body-content {
+    height: 100%;
+}
+
+/* Blazor error UI */
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    padding: 8px 16px;
+    background-color: var(--error-fill-rest, #fde7e9);
+    color: var(--error-on-fill-rest, #a4262c);
+    z-index: 1000;
+}
+
+#blazor-error-ui .reload { font-weight: 600; margin-left: 8px; }
+#blazor-error-ui .dismiss { float: right; cursor: pointer; }

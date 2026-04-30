@@ -1,0 +1,304 @@
+@page "/case/{DriveId}"
+@attribute [Authorize(Roles = "Lawyer")]
+@layout SharingSpace.Client.Components.Layout.MainLayout
+@inject GraphService Graph
+@inject NavigationManager Nav
+@inject IToastService Toast
+@inject IDialogService DialogService
+
+<PageTitle>@(_case?.Title ?? "Case Detail")</PageTitle>
+
+@if (_loadingCase)
+{
+    <FluentStack HorizontalAlignment="HorizontalAlignment.Center" Style="padding:60px">
+        <FluentProgressRing />
+    </FluentStack>
+}
+else if (_case is null)
+{
+    <FluentMessageBar Intent="MessageIntent.Error">
+        Case not found or you do not have access.
+    </FluentMessageBar>
+}
+else
+{
+    <FluentStack Orientation="Orientation.Vertical" Gap="24">
+
+        @* ── Breadcrumb ─────────────────────────────────────────────────── *@
+        <FluentBreadcrumb>
+            <FluentBreadcrumbItem Href="/lawyer">Active Cases</FluentBreadcrumbItem>
+            <FluentBreadcrumbItem>@_case.Title</FluentBreadcrumbItem>
+        </FluentBreadcrumb>
+
+        @* ── Case header ────────────────────────────────────────────────── *@
+        <FluentCard Style="padding:24px">
+            <FluentStack HorizontalAlignment="HorizontalAlignment.SpaceBetween"
+                         VerticalAlignment="VerticalAlignment.Top">
+                <FluentStack Orientation="Orientation.Vertical" Gap="8">
+                    <FluentLabel Typo="Typography.H5">@_case.Title</FluentLabel>
+                    <FluentLabel Color="Color.Neutral">Case #@_case.CaseNumber</FluentLabel>
+                    <FluentLabel>
+                        <b>Client:</b> @_case.ClientName
+                        @if (!string.IsNullOrEmpty(_case.ClientEmail))
+                        {
+                            <span> &lt;@_case.ClientEmail&gt;</span>
+                        }
+                    </FluentLabel>
+                    <FluentLabel><b>Assigned Lawyer:</b> @_case.AssignedLawyer</FluentLabel>
+                    <FluentLabel><b>Opened:</b> @_case.OpenedDate.ToString("dd MMMM yyyy")</FluentLabel>
+                </FluentStack>
+
+                <FluentStack Gap="8">
+                    <FluentBadge Appearance="Appearance.Accent" Fill="Filled">@_case.Status</FluentBadge>
+                    <FluentButton Appearance="Appearance.Lightweight"
+                                  Href="@($"https://graph.microsoft.com/v1.0/drives/{DriveId}")"
+                                  Target="_blank">
+                        <FluentIcon Value="@(new Icons.Regular.Size16.Open())" />
+                        &nbsp;Open in SharePoint
+                    </FluentButton>
+                </FluentStack>
+            </FluentStack>
+        </FluentCard>
+
+        @* ── Document list + upload ─────────────────────────────────────── *@
+        <FluentCard Style="padding:24px">
+            <FluentStack Orientation="Orientation.Vertical" Gap="16">
+
+                <FluentStack HorizontalAlignment="HorizontalAlignment.SpaceBetween"
+                             VerticalAlignment="VerticalAlignment.Center">
+                    <FluentLabel Typo="Typography.H6">
+                        <FluentIcon Value="@(new Icons.Regular.Size20.Document())" />
+                        &nbsp;Documents (@_documents.Count)
+                    </FluentLabel>
+                    <FluentStack Gap="8">
+                        <FluentButton Appearance="Appearance.Lightweight" OnClick="SyncDeltaAsync">
+                            <FluentIcon Value="@(new Icons.Regular.Size16.ArrowSyncCircle())" />
+                            &nbsp;Delta Sync
+                        </FluentButton>
+                        <FluentButton Appearance="Appearance.Accent" OnClick="ShowUploadDialogAsync">
+                            <FluentIcon Value="@(new Icons.Regular.Size16.ArrowUpload())" />
+                            &nbsp;Upload File
+                        </FluentButton>
+                    </FluentStack>
+                </FluentStack>
+
+                <DocumentList Documents="@_documents"
+                              IsLoading="@_loadingDocs"
+                              AllowShare="true"
+                              OnShareRequested="ShareDocumentAsync" />
+
+            </FluentStack>
+        </FluentCard>
+
+        @* ── Delta sync status ──────────────────────────────────────────── *@
+        @if (_lastDeltaSync.HasValue)
+        {
+            <FluentLabel Color="Color.Neutral" Style="font-size:12px">
+                Last delta sync: @_lastDeltaSync.Value.ToString("HH:mm:ss")
+                · @_deltaChanges changed file@(_deltaChanges == 1 ? "" : "s") detected
+            </FluentLabel>
+        }
+
+    </FluentStack>
+}
+
+@* ── Upload dialog ──────────────────────────────────────────────────────── *@
+<FluentDialog @ref="_uploadDialog" Hidden="@(!_showUpload)" Modal="true" TrapFocus="true"
+              AriaLabel="Upload document">
+    <FluentDialogHeader>Upload Document to @(_case?.Title ?? "Case")</FluentDialogHeader>
+    <FluentDialogBody>
+        <FluentStack Orientation="Orientation.Vertical" Gap="16">
+            <FluentLabel>Select a file to upload. Max 250 MB. Files are stored directly in SharePoint.</FluentLabel>
+            <InputFile OnChange="OnFileSelectedAsync" style="display:block" />
+            @if (_uploading)
+            {
+                <FluentStack Gap="8">
+                    <FluentProgressRing Style="width:20px;height:20px" />
+                    <FluentLabel>Uploading @_uploadFileName…</FluentLabel>
+                </FluentStack>
+            }
+        </FluentStack>
+    </FluentDialogBody>
+    <FluentDialogFooter>
+        <FluentButton Appearance="Appearance.Neutral" OnClick="CloseUpload" Disabled="@_uploading">Cancel</FluentButton>
+    </FluentDialogFooter>
+</FluentDialog>
+
+@* ── Share dialog ────────────────────────────────────────────────────────── *@
+<FluentDialog @ref="_shareDialog" Hidden="@(!_showShare)" Modal="true" TrapFocus="true"
+              AriaLabel="Share document with client">
+    <FluentDialogHeader>Share "@_shareTarget?.Name" with Client</FluentDialogHeader>
+    <FluentDialogBody>
+        <FluentStack Orientation="Orientation.Vertical" Gap="12">
+            <FluentLabel>
+                Enter the client's email address. They will receive a secure link requiring
+                their Microsoft account or a one-time passcode (OTP) – no Microsoft 365 licence required.
+            </FluentLabel>
+            <FluentTextField @bind-Value="_shareEmail"
+                             Label="Client email"
+                             Placeholder="client@example.com"
+                             Style="width:100%" />
+            @if (_generatedLink is not null)
+            {
+                <FluentMessageBar Intent="MessageIntent.Success">
+                    Link generated:
+                    <FluentAnchor Href="@_generatedLink" Target="_blank">@_generatedLink</FluentAnchor>
+                </FluentMessageBar>
+            }
+        </FluentStack>
+    </FluentDialogBody>
+    <FluentDialogFooter>
+        <FluentButton Appearance="Appearance.Neutral" OnClick="CloseShare">Close</FluentButton>
+        <FluentButton Appearance="Appearance.Accent" OnClick="GenerateSharingLinkAsync"
+                      Disabled="@(string.IsNullOrWhiteSpace(_shareEmail) || _sharing)">
+            @(_sharing ? "Generating…" : "Generate Secure Link")
+        </FluentButton>
+    </FluentDialogFooter>
+</FluentDialog>
+
+@code {
+    [Parameter] public string DriveId { get; set; } = string.Empty;
+
+    private Case? _case;
+    private List<CaseDocument> _documents = [];
+    private bool _loadingCase = true;
+    private bool _loadingDocs = true;
+
+    // Upload state
+    private FluentDialog? _uploadDialog;
+    private bool _showUpload;
+    private bool _uploading;
+    private string _uploadFileName = string.Empty;
+
+    // Share state
+    private FluentDialog? _shareDialog;
+    private bool _showShare;
+    private CaseDocument? _shareTarget;
+    private string _shareEmail = string.Empty;
+    private string? _generatedLink;
+    private bool _sharing;
+
+    // Delta sync
+    private DateTime? _lastDeltaSync;
+    private int _deltaChanges;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCaseAsync();
+        await LoadDocumentsAsync();
+    }
+
+    private async Task LoadCaseAsync()
+    {
+        _loadingCase = true;
+        try { _case = await Graph.GetCaseByIdAsync(DriveId); }
+        catch (Exception ex) { Toast.ShowError($"Could not load case: {ex.Message}"); }
+        finally { _loadingCase = false; }
+    }
+
+    private async Task LoadDocumentsAsync()
+    {
+        _loadingDocs = true;
+        try
+        {
+            var docs = await Graph.GetDocumentsAsync(DriveId);
+            _documents = docs.ToList();
+        }
+        catch (Exception ex) { Toast.ShowError($"Could not load documents: {ex.Message}"); }
+        finally { _loadingDocs = false; }
+    }
+
+    // ── Delta sync ─────────────────────────────────────────────────────────
+
+    private async Task SyncDeltaAsync()
+    {
+        try
+        {
+            var (changes, _) = await Graph.GetDocumentsDeltaAsync(DriveId);
+            _deltaChanges = changes.Count;
+            _lastDeltaSync = DateTime.Now;
+
+            // Merge changed items into the local list
+            foreach (var changed in changes)
+            {
+                var idx = _documents.FindIndex(d => d.Id == changed.Id);
+                if (idx >= 0) _documents[idx] = changed;
+                else _documents.Insert(0, changed);
+            }
+
+            Toast.ShowSuccess($"Delta sync complete – {_deltaChanges} change(s) detected.");
+        }
+        catch (Exception ex) { Toast.ShowError($"Delta sync failed: {ex.Message}"); }
+    }
+
+    // ── Upload ─────────────────────────────────────────────────────────────
+
+    private Task ShowUploadDialogAsync()
+    {
+        _showUpload = true;
+        return Task.CompletedTask;
+    }
+
+    private void CloseUpload()
+    {
+        _showUpload = false;
+        _uploading = false;
+        _uploadFileName = string.Empty;
+    }
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        _uploadFileName = file.Name;
+        _uploading = true;
+
+        try
+        {
+            const long maxBytes = 250L * 1024 * 1024;
+            await using var stream = file.OpenReadStream(maxBytes);
+            var doc = await Graph.UploadDocumentAsync(DriveId, file.Name, stream);
+
+            if (doc is not null)
+            {
+                _documents.Insert(0, doc);
+                Toast.ShowSuccess($"'{file.Name}' uploaded successfully.");
+            }
+        }
+        catch (Exception ex) { Toast.ShowError($"Upload failed: {ex.Message}"); }
+        finally { CloseUpload(); }
+    }
+
+    // ── Share ──────────────────────────────────────────────────────────────
+
+    private Task ShareDocumentAsync(CaseDocument doc)
+    {
+        _shareTarget = doc;
+        _shareEmail = _case?.ClientEmail ?? string.Empty;
+        _generatedLink = null;
+        _showShare = true;
+        return Task.CompletedTask;
+    }
+
+    private void CloseShare()
+    {
+        _showShare = false;
+        _shareTarget = null;
+        _generatedLink = null;
+        _shareEmail = string.Empty;
+    }
+
+    private async Task GenerateSharingLinkAsync()
+    {
+        if (_shareTarget is null) return;
+        _sharing = true;
+        try
+        {
+            _generatedLink = await Graph.CreateGuestSharingLinkAsync(
+                DriveId, _shareTarget.Id, _shareEmail);
+
+            Toast.ShowSuccess($"Secure link generated and sent to {_shareEmail}.");
+        }
+        catch (Exception ex) { Toast.ShowError($"Could not generate link: {ex.Message}"); }
+        finally { _sharing = false; }
+    }
+}

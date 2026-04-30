@@ -1,0 +1,70 @@
+@page "/"
+@layout SharingSpace.Client.Components.Layout.MainLayout
+
+<PageTitle>Secure Legal Portal</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center"
+             VerticalAlignment="VerticalAlignment.Center" Style="min-height:60vh;text-align:center" Gap="24">
+
+    <FluentIcon Value="@(new Icons.Regular.Size24.ShieldLock())" Color="Color.Accent" />
+
+    <FluentLabel Typo="Typography.H4">Welcome to the Secure Legal Portal</FluentLabel>
+
+    <FluentLabel Color="Color.Neutral" Style="max-width:480px">
+        Your files are stored securely inside your firm's Microsoft SharePoint environment.
+        Sign in with your Microsoft account or use the one-time passcode sent to your email.
+    </FluentLabel>
+
+    <AuthorizeView>
+        <Authorized>
+            <FluentStack Gap="12" HorizontalAlignment="HorizontalAlignment.Center">
+                <AuthorizeView Roles="Lawyer">
+                    <Authorized Context="lawyerCtx">
+                        <FluentButton Appearance="Appearance.Accent"
+                                      OnClick="@(() => Nav.NavigateTo("/lawyer"))">
+                            <FluentIcon Value="@(new Icons.Regular.Size20.Briefcase())" />
+                            &nbsp;View Active Cases
+                        </FluentButton>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Roles="Client">
+                    <Authorized Context="clientCtx">
+                        <FluentButton Appearance="Appearance.Accent"
+                                      OnClick="@(() => Nav.NavigateTo("/client"))">
+                            <FluentIcon Value="@(new Icons.Regular.Size20.Document())" />
+                            &nbsp;View My Documents
+                        </FluentButton>
+                    </Authorized>
+                </AuthorizeView>
+            </FluentStack>
+        </Authorized>
+        <NotAuthorized>
+            <FluentButton Appearance="Appearance.Accent"
+                          OnClick="@(() => Nav.NavigateTo("/MicrosoftIdentity/Account/SignIn"))">
+                Sign In
+            </FluentButton>
+        </NotAuthorized>
+    </AuthorizeView>
+
+    <FluentDivider Style="max-width:400px;margin:0 auto" />
+
+    <FluentStack Gap="24" HorizontalAlignment="HorizontalAlignment.Center" Wrap="true">
+        <FeatureTile Icon="@(new Icons.Regular.Size24.LockClosed())"
+                     Title="Secure by Design"
+                     Description="Files stay in your Microsoft 365 tenant. Nothing leaves SharePoint." />
+        <FeatureTile Icon="@(new Icons.Regular.Size24.Globe())"
+                     Title="External Client Access"
+                     Description="Clients sign in with Gmail or any email via one-time passcode – no Microsoft licence required." />
+        <FeatureTile Icon="@(new Icons.Regular.Size24.CheckmarkCircle())"
+                     Title="GDPR Compliant"
+                     Description="Data residency is maintained inside the firm's own tenant." />
+    </FluentStack>
+
+</FluentStack>
+
+@code {
+    [Inject] NavigationManager Nav { get; set; } = default!;
+}
+
+@* Inline sub-component for feature tiles *@
+@* Extracted here for brevity – can be moved to Components/Shared in larger projects *@

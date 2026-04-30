@@ -1,0 +1,53 @@
+@inherits LayoutComponentBase
+@inject IConfiguration Config
+
+<FluentLayout>
+    <FluentHeader>
+        <FluentStack HorizontalAlignment="HorizontalAlignment.Start" VerticalAlignment="VerticalAlignment.Center" Gap="12">
+            <img src="/images/firm-logo.svg" alt="@firmName logo" height="32" style="display:block" />
+            <FluentLabel Typo="Typography.H6" Color="Color.Fill">@firmName – Secure Legal Portal</FluentLabel>
+        </FluentStack>
+        <FluentSpacer />
+        <AuthorizeView>
+            <Authorized>
+                <FluentStack HorizontalAlignment="HorizontalAlignment.End" VerticalAlignment="VerticalAlignment.Center" Gap="8">
+                    <FluentLabel Color="Color.Fill">@context.User.Identity?.Name</FluentLabel>
+                    <FluentAnchor Href="/MicrosoftIdentity/Account/SignOut" Appearance="Appearance.Neutral">Sign out</FluentAnchor>
+                </FluentStack>
+            </Authorized>
+            <NotAuthorized>
+                <FluentAnchor Href="/MicrosoftIdentity/Account/SignIn" Appearance="Appearance.Accent">Sign in</FluentAnchor>
+            </NotAuthorized>
+        </AuthorizeView>
+    </FluentHeader>
+
+    <FluentBodyContent>
+        <FluentStack Orientation="Orientation.Horizontal" Style="height:100%">
+            <NavMenu />
+            <FluentStack Orientation="Orientation.Vertical" Style="flex:1;padding:24px;overflow-y:auto">
+                @Body
+            </FluentStack>
+        </FluentStack>
+    </FluentBodyContent>
+
+    <FluentFooter>
+        <FluentLabel Color="Color.Disabled">
+            &copy; @DateTime.Now.Year @firmName. Files stored securely in Microsoft SharePoint.
+        </FluentLabel>
+    </FluentFooter>
+</FluentLayout>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">&#x2715;</a>
+</div>
+
+@code {
+    private string firmName = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        firmName = Config["Portal:FirmName"] ?? "Law Firm LLP";
+    }
+}
