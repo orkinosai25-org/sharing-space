@@ -50,12 +50,15 @@ else
 
                 <FluentStack Gap="8">
                     <FluentBadge Appearance="Appearance.Accent" Fill="Filled">@_case.Status</FluentBadge>
-                    <FluentButton Appearance="Appearance.Lightweight"
-                                  Href="@($"https://graph.microsoft.com/v1.0/drives/{DriveId}")"
-                                  Target="_blank">
-                        <FluentIcon Value="@(new Icons.Regular.Size16.Open())" />
-                        &nbsp;Open in SharePoint
-                    </FluentButton>
+                    @if (!string.IsNullOrEmpty(_case.WebUrl))
+                    {
+                        <FluentButton Appearance="Appearance.Lightweight"
+                                      Href="@_case.WebUrl"
+                                      Target="_blank">
+                            <FluentIcon Value="@(new Icons.Regular.Size16.Open())" />
+                            &nbsp;Open in SharePoint
+                        </FluentButton>
+                    }
                 </FluentStack>
             </FluentStack>
         </FluentCard>

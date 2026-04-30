@@ -18,6 +18,7 @@ public class Case
     public DateTime? LastActivityDate { get; set; }
     public string SharePointSiteId { get; set; } = string.Empty;
     public string DriveId { get; set; } = string.Empty;
+    public string WebUrl { get; set; } = string.Empty;
     public int DocumentCount { get; set; }
 }
 

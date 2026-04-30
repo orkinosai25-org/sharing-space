@@ -99,7 +99,7 @@ public class GraphService
     public async Task<IReadOnlyList<CaseDocument>> GetDocumentsAsync(
         string driveId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Fetching documents for drive {DriveId}", driveId);
+        _logger.LogInformation("Fetching documents for drive {DriveId}", Sanitize(driveId));
 
         // Resolve the root folder ID first
         var root = await _graphClient.Drives[driveId].Root
@@ -136,7 +136,7 @@ public class GraphService
     public async Task<(IReadOnlyList<CaseDocument> Changes, string NewDeltaToken)>
         GetDocumentsDeltaAsync(string driveId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Running delta sync for drive {DriveId}", driveId);
+        _logger.LogInformation("Running delta sync for drive {DriveId}", Sanitize(driveId));
 
         // Resolve root folder ID (needed to call Items[rootId].Delta)
         var root = await _graphClient.Drives[driveId].Root
@@ -152,10 +152,10 @@ public class GraphService
         var deltaResult = !string.IsNullOrEmpty(deltaToken)
             ? await _graphClient.Drives[driveId].Items[root.Id].Delta
                 .WithUrl(deltaToken)
-                .GetAsync(cancellationToken: ct)
+                .GetAsDeltaGetResponseAsync(cancellationToken: ct)
                 .ConfigureAwait(false)
             : await _graphClient.Drives[driveId].Items[root.Id].Delta
-                .GetAsync(cancellationToken: ct)
+                .GetAsDeltaGetResponseAsync(cancellationToken: ct)
                 .ConfigureAwait(false);
 
         var changedItems = new List<CaseDocument>();
@@ -180,7 +180,7 @@ public class GraphService
 
             page = await _graphClient.Drives[driveId].Items[root.Id].Delta
                 .WithUrl(page.OdataNextLink)
-                .GetAsync(cancellationToken: ct)
+                .GetAsDeltaGetResponseAsync(cancellationToken: ct)
                 .ConfigureAwait(false);
         }
 
@@ -211,7 +211,7 @@ public class GraphService
         Stream content,
         CancellationToken ct = default)
     {
-        _logger.LogInformation("Uploading {FileName} to drive {DriveId}", fileName, driveId);
+        _logger.LogInformation("Uploading {FileName} to drive {DriveId}", Sanitize(fileName), Sanitize(driveId));
 
         content.Position = 0;
 
@@ -239,8 +239,9 @@ public class GraphService
         string recipientEmail,
         CancellationToken ct = default)
     {
+        // Log item ID only – never log the recipient email (PII)
         _logger.LogInformation(
-            "Creating sharing link for item {ItemId} → {Email}", itemId, recipientEmail);
+            "Creating sharing link for item {ItemId}", Sanitize(itemId));
 
         var permission = await _graphClient.Drives[driveId].Items[itemId]
             .CreateLink
@@ -269,6 +270,7 @@ public class GraphService
         CaseNumber = drive.Description ?? string.Empty,
         OpenedDate = drive.CreatedDateTime?.UtcDateTime ?? DateTime.UtcNow,
         LastActivityDate = drive.LastModifiedDateTime?.UtcDateTime,
+        WebUrl = drive.WebUrl ?? string.Empty,
         Status = CaseStatus.Active
     };
 
@@ -311,8 +313,16 @@ public class GraphService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not count items in drive {DriveId}", driveId);
+            _logger.LogWarning(ex, "Could not count items in drive {DriveId}", Sanitize(driveId));
             return 0;
         }
     }
+
+    /// <summary>
+    /// Removes CRLF characters from a string before it is written to a log entry
+    /// to prevent log-injection (CWE-117 / CodeQL cs/log-forging).
+    /// </summary>
+    private static string Sanitize(string value) =>
+        value.Replace("\r", string.Empty, StringComparison.Ordinal)
+             .Replace("\n", string.Empty, StringComparison.Ordinal);
 }

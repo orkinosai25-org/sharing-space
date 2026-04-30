@@ -43,6 +43,11 @@
     <a class="dismiss">&#x2715;</a>
 </div>
 
+@* Fluent UI toast, dialog and tooltip providers must live inside the Blazor render tree *@
+<FluentToastProvider MaxToasts="5" Position="ToastPosition.BottomRight" />
+<FluentDialogProvider />
+<FluentTooltipProvider />
+
 @code {
     private string firmName = string.Empty;
 
