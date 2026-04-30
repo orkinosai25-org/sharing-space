@@ -1,0 +1,43 @@
+@inject NavigationManager Nav
+
+<FluentNavMenu Width="220" Title="Navigation" Style="height:100%;border-right:1px solid var(--neutral-stroke-rest)">
+    <AuthorizeView>
+        <Authorized Context="authCtx">
+            @* Lawyer role: Active Cases + invite tools *@
+            <AuthorizeView Roles="Lawyer">
+                <Authorized Context="lawyerCtx">
+                    <FluentNavLink Href="/lawyer" Icon="@(new Icons.Regular.Size20.Briefcase())" Match="NavLinkMatch.All">
+                        Active Cases
+                    </FluentNavLink>
+                    <FluentNavLink Href="/invite" Icon="@(new Icons.Regular.Size20.PersonAdd())">
+                        Invite Client
+                    </FluentNavLink>
+                </Authorized>
+            </AuthorizeView>
+
+            @* Client role: My Documents *@
+            <AuthorizeView Roles="Client">
+                <Authorized Context="clientCtx">
+                    <FluentNavLink Href="/client" Icon="@(new Icons.Regular.Size20.Document())" Match="NavLinkMatch.All">
+                        My Documents
+                    </FluentNavLink>
+                </Authorized>
+            </AuthorizeView>
+
+            @* Fallback for users whose role is not yet assigned *@
+            <AuthorizeView Roles="Lawyer,Client" Context="fallback">
+                <NotAuthorized>
+                    <FluentNavLink Href="/" Icon="@(new Icons.Regular.Size20.Home())" Match="NavLinkMatch.All">
+                        Home
+                    </FluentNavLink>
+                </NotAuthorized>
+            </AuthorizeView>
+        </Authorized>
+        <NotAuthorized>
+            <FluentNavLink Href="/" Icon="@(new Icons.Regular.Size20.Home())" Match="NavLinkMatch.All">
+                Home
+            </FluentNavLink>
+        </NotAuthorized>
+    </AuthorizeView>
+</FluentNavMenu>
+

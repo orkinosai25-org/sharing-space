@@ -1,0 +1,26 @@
+@using Microsoft.FluentUI.AspNetCore.Components
+@using Icons = Microsoft.FluentUI.AspNetCore.Components.Icons
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                <FluentStack Orientation="Orientation.Vertical"
+                             HorizontalAlignment="HorizontalAlignment.Center"
+                             Style="padding:60px;text-align:center" Gap="16">
+                    <FluentIcon Value="@(new Icons.Regular.Size24.LockClosed())" Color="Color.Error" />
+                    <FluentLabel Typo="Typography.H5">Access Denied</FluentLabel>
+                    <FluentLabel Color="Color.Neutral">
+                        You do not have permission to view this page.
+                    </FluentLabel>
+                    <FluentButton Appearance="Appearance.Accent"
+                                  OnClick="@(() => Navigation.NavigateTo("/MicrosoftIdentity/Account/SignIn", true))">
+                        Sign In
+                    </FluentButton>
+                </FluentStack>
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>
+
+@inject NavigationManager Navigation

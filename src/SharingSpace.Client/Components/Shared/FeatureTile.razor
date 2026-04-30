@@ -1,0 +1,15 @@
+@* FeatureTile.razor – Small informational tile used on the Home page *@
+
+<FluentCard Style="width:200px;padding:20px;text-align:center">
+    <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Gap="10">
+        <FluentIcon Value="@Icon" Color="Color.Accent" />
+        <FluentLabel Typo="Typography.Body" Style="font-weight:600">@Title</FluentLabel>
+        <FluentLabel Color="Color.Neutral" Style="font-size:13px">@Description</FluentLabel>
+    </FluentStack>
+</FluentCard>
+
+@code {
+    [Parameter, EditorRequired] public Icon Icon { get; set; } = default!;
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Description { get; set; } = string.Empty;
+}

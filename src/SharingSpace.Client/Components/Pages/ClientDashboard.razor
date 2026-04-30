@@ -1,0 +1,116 @@
+@page "/client"
+@attribute [Authorize(Roles = "Client")]
+@layout SharingSpace.Client.Components.Layout.MainLayout
+@inject GraphService Graph
+@inject AuthenticationStateProvider AuthState
+@inject IToastService Toast
+
+<PageTitle>My Documents – Client Portal</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" Gap="24">
+
+    @* ── Header ────────────────────────────────────────────────────────── *@
+    <FluentStack HorizontalAlignment="HorizontalAlignment.SpaceBetween"
+                 VerticalAlignment="VerticalAlignment.Center">
+        <FluentLabel Typo="Typography.H4">
+            <FluentIcon Value="@(new Icons.Regular.Size24.Document())" Color="Color.Accent" />
+            &nbsp;My Documents
+        </FluentLabel>
+        <FluentButton Appearance="Appearance.Lightweight" OnClick="RefreshAsync">
+            <FluentIcon Value="@(new Icons.Regular.Size16.ArrowClockwise())" />
+            &nbsp;Refresh
+        </FluentButton>
+    </FluentStack>
+
+    <FluentLabel Color="Color.Neutral">
+        All files below are stored securely in your law firm's SharePoint environment.
+        You can download or open any document using the action buttons on the right.
+    </FluentLabel>
+
+    @* ── My cases list ─────────────────────────────────────────────────── *@
+    @if (_loading)
+    {
+        <FluentStack HorizontalAlignment="HorizontalAlignment.Center" Style="padding:40px">
+            <FluentProgressRing />
+            <FluentLabel>Loading your documents…</FluentLabel>
+        </FluentStack>
+    }
+    else if (!_cases.Any())
+    {
+        <FluentMessageBar Intent="MessageIntent.Info">
+            No documents have been shared with you yet. Please contact your lawyer.
+        </FluentMessageBar>
+    }
+    else
+    {
+        @foreach (var c in _cases)
+        {
+            <FluentCard Style="padding:20px">
+                <FluentStack Orientation="Orientation.Vertical" Gap="12">
+                    <FluentStack HorizontalAlignment="HorizontalAlignment.SpaceBetween"
+                                 VerticalAlignment="VerticalAlignment.Center">
+                        <FluentLabel Typo="Typography.H6">@c.Title</FluentLabel>
+                        <FluentBadge Appearance="Appearance.Neutral" Fill="Filled">@c.Status</FluentBadge>
+                    </FluentStack>
+
+                    <DocumentList Documents="@GetDocumentsForCase(c.DriveId)"
+                                  IsLoading="@IsLoadingDocs(c.DriveId)"
+                                  AllowShare="false" />
+                </FluentStack>
+            </FluentCard>
+        }
+    }
+
+</FluentStack>
+
+@code {
+    private string _clientEmail = string.Empty;
+    private List<Case> _cases = [];
+    private Dictionary<string, IReadOnlyList<CaseDocument>> _documentsByDrive = new();
+    private HashSet<string> _loadingDrives = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        _clientEmail = auth.User.Identity?.Name ?? string.Empty;
+        await LoadAsync();
+    }
+
+    private async Task RefreshAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var cases = await Graph.GetCasesForClientAsync(_clientEmail);
+            _cases = cases.ToList();
+
+            // Load documents for each case in parallel
+            var tasks = _cases.Select(async c =>
+            {
+                _loadingDrives.Add(c.DriveId);
+                var docs = await Graph.GetDocumentsAsync(c.DriveId);
+                _documentsByDrive[c.DriveId] = docs;
+                _loadingDrives.Remove(c.DriveId);
+                await InvokeAsync(StateHasChanged);
+            });
+
+            await Task.WhenAll(tasks);
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to load documents: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private IReadOnlyList<CaseDocument> GetDocumentsForCase(string driveId) =>
+        _documentsByDrive.TryGetValue(driveId, out var docs) ? docs : [];
+
+    private bool IsLoadingDocs(string driveId) => _loadingDrives.Contains(driveId);
+}

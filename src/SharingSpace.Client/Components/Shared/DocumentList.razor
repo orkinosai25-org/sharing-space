@@ -1,0 +1,62 @@
+@* DocumentList.razor – Fluent UI DataGrid listing documents in a case *@
+
+<FluentStack Orientation="Orientation.Vertical" Gap="16">
+
+    @if (IsLoading)
+    {
+        <FluentProgressRing />
+    }
+    else if (!Documents.Any())
+    {
+        <FluentMessageBar Intent="MessageIntent.Info">
+            No documents found in this case yet.
+        </FluentMessageBar>
+    }
+    else
+    {
+        <FluentDataGrid Items="@Documents.AsQueryable()"
+                        GridTemplateColumns="2fr 1fr 1fr 1fr auto"
+                        Style="width:100%">
+            <PropertyColumn Property="@(d => d.Name)" Title="File Name" Sortable="true" />
+            <PropertyColumn Property="@(d => d.UploadedBy)" Title="Uploaded By" Sortable="true" />
+            <PropertyColumn Property="@(d => d.DisplaySize)" Title="Size" />
+            <PropertyColumn Property="@(d => d.LastModifiedDateTime)" Title="Modified"
+                            Format="dd MMM yyyy HH:mm" Sortable="true" />
+            <TemplateColumn Title="Actions">
+                <FluentStack Gap="4">
+                    @if (!string.IsNullOrEmpty(context.DownloadUrl))
+                    {
+                        <FluentAnchor Href="@context.DownloadUrl"
+                                      Target="_blank"
+                                      Appearance="Appearance.Lightweight"
+                                      Title="Download">
+                            <FluentIcon Value="@(new Icons.Regular.Size16.ArrowDownload())" />
+                        </FluentAnchor>
+                    }
+                    <FluentAnchor Href="@context.WebUrl"
+                                  Target="_blank"
+                                  Appearance="Appearance.Lightweight"
+                                  Title="Open in SharePoint">
+                        <FluentIcon Value="@(new Icons.Regular.Size16.Open())" />
+                    </FluentAnchor>
+                    @if (AllowShare)
+                    {
+                        <FluentButton Appearance="Appearance.Lightweight"
+                                      Title="Share with client"
+                                      OnClick="@(() => OnShareRequested.InvokeAsync(context))">
+                            <FluentIcon Value="@(new Icons.Regular.Size16.Share())" />
+                        </FluentButton>
+                    }
+                </FluentStack>
+            </TemplateColumn>
+        </FluentDataGrid>
+    }
+
+</FluentStack>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<CaseDocument> Documents { get; set; } = [];
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public bool AllowShare { get; set; }
+    [Parameter] public EventCallback<CaseDocument> OnShareRequested { get; set; }
+}
