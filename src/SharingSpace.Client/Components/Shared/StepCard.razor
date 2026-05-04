@@ -1,0 +1,18 @@
+@* StepCard.razor – Numbered step card for the onboarding wizard *@
+
+<FluentCard Style="min-width:200px;padding:20px;text-align:center">
+    <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Gap="10">
+        <FluentBadge Appearance="Appearance.Accent" Fill="Filled"
+                     Style="font-size:16px;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center">
+            @Number
+        </FluentBadge>
+        <FluentLabel Typo="Typography.Body" Style="font-weight:600">@Title</FluentLabel>
+        <FluentLabel Color="Color.Neutral" Style="font-size:13px">@Description</FluentLabel>
+    </FluentStack>
+</FluentCard>
+
+@code {
+    [Parameter, EditorRequired] public int Number { get; set; }
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Description { get; set; } = string.Empty;
+}

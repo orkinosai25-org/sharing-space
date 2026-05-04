@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using SharingSpace.Client.Models;
@@ -10,26 +11,72 @@ namespace SharingSpace.Client.Services;
 /// client's files on behalf of the firm without requiring interactive sign-in
 /// for each operation.
 ///
+/// Multi-tenant: the <see cref="GraphServiceClient"/> is resolved per-call
+/// from <see cref="_clientFactory"/> using the authenticated user's <c>tid</c>
+/// (tenant ID) claim so that a single app registration serves any onboarded
+/// law firm automatically.
+///
 /// Delta queries are used to sync file changes efficiently; only the items
 /// changed since the last sync token are returned, avoiding rate-limit issues.
 /// </summary>
 public class GraphService
 {
-    private readonly GraphServiceClient _graphClient;
+    private readonly Func<string, GraphServiceClient> _clientFactory;
+    private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<GraphService> _logger;
     private readonly IConfiguration _config;
+
+    // Cached tenant ID for the lifetime of this scoped service (one per Blazor circuit)
+    private string? _tenantId;
 
     // In-memory delta token store (replace with persistent cache in production)
     private readonly Dictionary<string, DeltaSyncState> _deltaTokens = new();
 
+    // Well-known claim names for the tenant ID in Microsoft identity tokens
+    private const string TidClaimType = "tid";
+    private const string TidClaimTypeLong = "http://schemas.microsoft.com/identity/claims/tenantid";
+
     public GraphService(
-        GraphServiceClient graphClient,
+        Func<string, GraphServiceClient> clientFactory,
+        AuthenticationStateProvider authState,
         ILogger<GraphService> logger,
         IConfiguration config)
     {
-        _graphClient = graphClient;
+        _clientFactory = clientFactory;
+        _authState = authState;
         _logger = logger;
         _config = config;
+    }
+
+    /// <summary>
+    /// Resolves and caches the <see cref="GraphServiceClient"/> for the current
+    /// user's tenant.  Throws <see cref="InvalidOperationException"/> when the
+    /// authenticated user's token does not contain a valid GUID-format tenant ID,
+    /// which prevents accidental cross-tenant Graph calls.
+    /// </summary>
+    private async Task<GraphServiceClient> GetClientAsync()
+    {
+        if (_tenantId is null)
+        {
+            var auth = await _authState.GetAuthenticationStateAsync();
+            var rawId =
+                auth.User.FindFirst(TidClaimType)?.Value ??
+                auth.User.FindFirst(TidClaimTypeLong)?.Value;
+
+            // Validate that the resolved tenant ID is a GUID so we never call Graph
+            // with "organizations" or any other non-tenant placeholder.
+            if (rawId is null || !Guid.TryParse(rawId, out _))
+            {
+                throw new InvalidOperationException(
+                    "A valid tenant ID (GUID) could not be resolved from the authenticated " +
+                    "user's 'tid' claim. Ensure the user is fully authenticated via " +
+                    "Microsoft Entra ID before calling Graph API.");
+            }
+
+            _tenantId = rawId;
+        }
+
+        return _clientFactory(_tenantId);
     }
 
     // ─── Cases ───────────────────────────────────────────────────────────────
@@ -45,7 +92,8 @@ public class GraphService
 
         _logger.LogInformation("Fetching cases from SharePoint site {SiteId}", siteId);
 
-        var drives = await _graphClient.Sites[siteId].Drives
+        var client = await GetClientAsync();
+        var drives = await client.Sites[siteId].Drives
             .GetAsync(req => req.QueryParameters.Select = new[]
             {
                 "id", "name", "description", "createdDateTime", "lastModifiedDateTime"
@@ -83,7 +131,7 @@ public class GraphService
     /// <summary>Gets a single case by its SharePoint drive ID.</summary>
     public async Task<Case?> GetCaseByIdAsync(string driveId, CancellationToken ct = default)
     {
-        var drive = await _graphClient.Drives[driveId]
+        var drive = await (await GetClientAsync()).Drives[driveId]
             .GetAsync(cancellationToken: ct)
             .ConfigureAwait(false);
 
@@ -101,14 +149,16 @@ public class GraphService
     {
         _logger.LogInformation("Fetching documents for drive {DriveId}", Sanitize(driveId));
 
+        var client = await GetClientAsync();
+
         // Resolve the root folder ID first
-        var root = await _graphClient.Drives[driveId].Root
+        var root = await client.Drives[driveId].Root
             .GetAsync(cancellationToken: ct)
             .ConfigureAwait(false);
 
         if (root?.Id is null) return [];
 
-        var children = await _graphClient.Drives[driveId].Items[root.Id].Children
+        var children = await client.Drives[driveId].Items[root.Id].Children
             .GetAsync(req =>
             {
                 req.QueryParameters.Select = new[]
@@ -138,8 +188,10 @@ public class GraphService
     {
         _logger.LogInformation("Running delta sync for drive {DriveId}", Sanitize(driveId));
 
+        var client = await GetClientAsync();
+
         // Resolve root folder ID (needed to call Items[rootId].Delta)
-        var root = await _graphClient.Drives[driveId].Root
+        var root = await client.Drives[driveId].Root
             .GetAsync(cancellationToken: ct)
             .ConfigureAwait(false);
 
@@ -150,11 +202,11 @@ public class GraphService
 
         // If we have a stored delta link, use it directly via WithUrl for incremental sync
         var deltaResult = !string.IsNullOrEmpty(deltaToken)
-            ? await _graphClient.Drives[driveId].Items[root.Id].Delta
+            ? await client.Drives[driveId].Items[root.Id].Delta
                 .WithUrl(deltaToken)
                 .GetAsDeltaGetResponseAsync(cancellationToken: ct)
                 .ConfigureAwait(false)
-            : await _graphClient.Drives[driveId].Items[root.Id].Delta
+            : await client.Drives[driveId].Items[root.Id].Delta
                 .GetAsDeltaGetResponseAsync(cancellationToken: ct)
                 .ConfigureAwait(false);
 
@@ -178,7 +230,7 @@ public class GraphService
 
             if (page.OdataNextLink is null) break;
 
-            page = await _graphClient.Drives[driveId].Items[root.Id].Delta
+            page = await client.Drives[driveId].Items[root.Id].Delta
                 .WithUrl(page.OdataNextLink)
                 .GetAsDeltaGetResponseAsync(cancellationToken: ct)
                 .ConfigureAwait(false);
@@ -215,8 +267,10 @@ public class GraphService
 
         content.Position = 0;
 
+        var client = await GetClientAsync();
+
         // Use the path-based item reference: drives/{id}/root:/{fileName}:
-        var driveItem = await _graphClient.Drives[driveId]
+        var driveItem = await client.Drives[driveId]
             .Root
             .ItemWithPath(Uri.EscapeDataString(fileName))
             .Content
@@ -243,7 +297,7 @@ public class GraphService
         _logger.LogInformation(
             "Creating sharing link for item {ItemId}", Sanitize(itemId));
 
-        var permission = await _graphClient.Drives[driveId].Items[itemId]
+        var permission = await (await GetClientAsync()).Drives[driveId].Items[itemId]
             .CreateLink
             .PostAsync(new Microsoft.Graph.Drives.Item.Items.Item.CreateLink.CreateLinkPostRequestBody
             {
@@ -299,13 +353,15 @@ public class GraphService
     {
         try
         {
-            var root = await _graphClient.Drives[driveId].Root
+            var client = await GetClientAsync();
+
+            var root = await client.Drives[driveId].Root
                 .GetAsync(cancellationToken: ct)
                 .ConfigureAwait(false);
 
             if (root?.Id is null) return 0;
 
-            var children = await _graphClient.Drives[driveId].Items[root.Id].Children
+            var children = await client.Drives[driveId].Items[root.Id].Children
                 .GetAsync(req => req.QueryParameters.Select = new[] { "id" }, ct)
                 .ConfigureAwait(false);
 

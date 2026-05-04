@@ -1,0 +1,206 @@
+@page "/onboard"
+@layout SharingSpace.Client.Components.Layout.MainLayout
+@inject IConfiguration Config
+@inject NavigationManager Nav
+
+<PageTitle>Onboard Your Law Firm – Secure Legal Portal</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" Gap="32" Style="max-width:780px;margin:0 auto">
+
+    @* ── Page header ──────────────────────────────────────────────────────── *@
+    <FluentStack Orientation="Orientation.Vertical" Gap="8">
+        <FluentLabel Typo="Typography.H4">
+            <FluentIcon Value="@(new Icons.Regular.Size24.BuildingBank())" Color="Color.Accent" />
+            &nbsp;Onboard Your Law Firm
+        </FluentLabel>
+        <FluentLabel Color="Color.Neutral">
+            Grant this portal one-time access to your firm's Microsoft 365 tenant so that
+            lawyers and authorised clients can securely access SharePoint documents through
+            a branded interface — without changing anything in your existing SharePoint setup.
+        </FluentLabel>
+    </FluentStack>
+
+    @* ── Configuration / consent / error banners ─────────────────────────── *@
+    @if (_configError is not null)
+    {
+        <FluentMessageBar Intent="MessageIntent.Error">
+            <b>Portal is not configured correctly.</b> @_configError
+        </FluentMessageBar>
+    }
+    else if (_consentGranted)
+    {
+        <FluentMessageBar Intent="MessageIntent.Success">
+            <b>Access granted!</b> Tenant <code>@_consentTenantId</code> has been onboarded successfully.
+            Lawyers at your firm can now sign in and access SharePoint cases through this portal.
+        </FluentMessageBar>
+    }
+    else if (_consentError is not null)
+    {
+        <FluentMessageBar Intent="MessageIntent.Error">
+            <b>Consent was not completed.</b> @_consentError
+            Please try again or contact support if the problem persists.
+        </FluentMessageBar>
+    }
+
+    @* ── Step-by-step instructions ─────────────────────────────────────────── *@
+    <FluentCard Style="padding:28px">
+        <FluentStack Orientation="Orientation.Vertical" Gap="20">
+
+            <FluentLabel Typo="Typography.H6">
+                <FluentIcon Value="@(new Icons.Regular.Size20.NumberSymbol())" />
+                &nbsp;How it works
+            </FluentLabel>
+
+            <FluentStack Gap="16" Wrap="true">
+                <StepCard Number="1"
+                          Title="IT Admin clicks the button below"
+                          Description="A Microsoft login screen opens in the same browser tab." />
+                <StepCard Number="2"
+                          Title="Admin reviews and approves the permissions"
+                          Description="The portal only requests read/write access to SharePoint drives and file storage – nothing else." />
+                <StepCard Number="3"
+                          Title="Firm is instantly onboarded"
+                          Description="Lawyers and clients can sign in immediately using their existing Microsoft 365 accounts." />
+            </FluentStack>
+
+        </FluentStack>
+    </FluentCard>
+
+    @* ── Permissions requested ─────────────────────────────────────────────── *@
+    <FluentCard Style="padding:28px">
+        <FluentStack Orientation="Orientation.Vertical" Gap="16">
+
+            <FluentLabel Typo="Typography.H6">
+                <FluentIcon Value="@(new Icons.Regular.Size20.ShieldLock())" />
+                &nbsp;Permissions requested
+            </FluentLabel>
+
+            <FluentDataGrid Items="@_permissions.AsQueryable()"
+                            GridTemplateColumns="1fr 2fr"
+                            Style="width:100%">
+                <PropertyColumn Property="@(p => p.Scope)" Title="Permission" />
+                <PropertyColumn Property="@(p => p.Reason)" Title="Why it's needed" />
+            </FluentDataGrid>
+
+            <FluentLabel Color="Color.Neutral" Style="font-size:13px">
+                These are <b>application permissions</b> (app-only) so the portal server
+                can access SharePoint on behalf of the firm without requiring each lawyer
+                to stay signed in. Your firm's data never leaves Microsoft's infrastructure.
+            </FluentLabel>
+
+        </FluentStack>
+    </FluentCard>
+
+    @* ── CTA button ────────────────────────────────────────────────────────── *@
+    <FluentCard Style="padding:28px;text-align:center">
+        <FluentStack Orientation="Orientation.Vertical" Gap="16" HorizontalAlignment="HorizontalAlignment.Center">
+
+            <FluentLabel Typo="Typography.H6">Ready to connect your firm?</FluentLabel>
+            <FluentLabel Color="Color.Neutral" Style="max-width:520px">
+                Click below to open the Microsoft admin consent screen.
+                You must be a <b>Global Administrator</b> (or Application Administrator)
+                in your Microsoft Entra ID tenant to approve this.
+            </FluentLabel>
+
+            <FluentButton Appearance="Appearance.Accent"
+                          Href="@_adminConsentUrl"
+                          Disabled="@(_configError is not null)"
+                          Style="min-width:260px">
+                <FluentIcon Value="@(new Icons.Regular.Size20.CheckmarkCircle())" />
+                &nbsp;Grant Access to Your Firm's Microsoft 365
+            </FluentButton>
+
+            <FluentLabel Color="Color.Neutral" Style="font-size:12px">
+                You will be redirected to
+                <code>login.microsoftonline.com</code> – a Microsoft-owned domain.
+                This portal does not store your credentials.
+            </FluentLabel>
+
+        </FluentStack>
+    </FluentCard>
+
+    @* ── FAQ ───────────────────────────────────────────────────────────────── *@
+    <FluentAccordion>
+        <FluentAccordionItem Heading="What happens to our existing SharePoint site?">
+            Nothing changes in SharePoint. The portal reads and writes files using
+            the same Microsoft Graph API that Microsoft's own apps use. Your folder
+            structure, permissions, and retention policies remain untouched.
+        </FluentAccordionItem>
+        <FluentAccordionItem Heading="Can we revoke access later?">
+            Yes. A Global Administrator can revoke consent at any time from
+            <b>Microsoft Entra ID → Enterprise Applications → @_appName → Permissions</b>.
+            Revoking removes access immediately.
+        </FluentAccordionItem>
+        <FluentAccordionItem Heading="Do our clients need a Microsoft account?">
+            No. External clients can sign in using a One-Time Passcode (OTP) sent to
+            any email address — no Microsoft 365 licence required.
+        </FluentAccordionItem>
+        <FluentAccordionItem Heading="Is this GDPR compliant?">
+            Yes. Files always reside inside your firm's own Microsoft 365 tenant
+            and are governed by Microsoft's data processing agreements.
+            The portal application hosted on Azure processes only the metadata
+            needed to display the file list; actual file bytes are streamed
+            directly from SharePoint to the user's browser.
+        </FluentAccordionItem>
+    </FluentAccordion>
+
+</FluentStack>
+
+@* ── Inline sub-component: numbered step card ────────────────────────────── *@
+
+@code {
+    // Query-string parameters set by Microsoft after the admin consent flow
+    [SupplyParameterFromQuery(Name = "admin_consent")] public string? AdminConsent { get; set; }
+    [SupplyParameterFromQuery(Name = "tenant")] public string? ConsentTenant { get; set; }
+    [SupplyParameterFromQuery(Name = "error")] public string? Error { get; set; }
+    [SupplyParameterFromQuery(Name = "error_description")] public string? ErrorDescription { get; set; }
+
+    private bool _consentGranted;
+    private string? _consentTenantId;
+    private string? _consentError;
+    private string? _configError;
+    private string _adminConsentUrl = "#";
+    private string _appName = "Sharing Space Legal Portal";
+
+    private record PermissionRow(string Scope, string Reason);
+
+    private readonly PermissionRow[] _permissions =
+    [
+        new("Sites.ReadWrite.All",  "Read and write SharePoint Document Libraries (case files)."),
+        new("Files.ReadWrite.All",  "Upload and download files within those libraries."),
+        new("User.Read.All",        "Resolve lawyer display names for audit trails.")
+    ];
+
+    protected override void OnInitialized()
+    {
+        var clientId = Config["AzureAd:ClientId"];
+        _appName   = Config["Portal:FirmName"] ?? "Sharing Space Legal Portal";
+
+        if (string.IsNullOrWhiteSpace(clientId) || !Guid.TryParse(clientId, out _))
+        {
+            _configError = "AzureAd:ClientId is not configured or is not a valid GUID. " +
+                           "Please set the correct Application (client) ID from your Entra app registration.";
+            return;
+        }
+
+        // Build the admin consent URL using the /organizations endpoint so any
+        // Microsoft Entra ID tenant can grant consent in a multi-tenant flow.
+        var redirectUri = Nav.BaseUri.TrimEnd('/') + "/onboard";
+        _adminConsentUrl =
+            $"https://login.microsoftonline.com/organizations/v2.0/adminconsent" +
+            $"?client_id={Uri.EscapeDataString(clientId)}" +
+            $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
+            $"&scope={Uri.EscapeDataString("https://graph.microsoft.com/.default")}";
+
+        // Handle redirect back from Microsoft after admin consent
+        if (string.Equals(AdminConsent, "True", StringComparison.OrdinalIgnoreCase))
+        {
+            _consentGranted  = true;
+            _consentTenantId = ConsentTenant;
+        }
+        else if (Error is not null)
+        {
+            _consentError = ErrorDescription ?? Error;
+        }
+    }
+}
