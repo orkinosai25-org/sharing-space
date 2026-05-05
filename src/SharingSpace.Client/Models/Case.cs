@@ -1,7 +1,7 @@
 namespace SharingSpace.Client.Models;
 
 /// <summary>
-/// Represents a legal case stored as a SharePoint Document Library.
+/// Represents a workspace (SharePoint Document Library) shared with an external collaborator.
 /// Metadata columns (ClientName, CaseId, Status) are mapped from
 /// the SharePoint list column schema via the Microsoft Graph API.
 /// </summary>
@@ -13,7 +13,7 @@ public class Case
     public string ClientName { get; set; } = string.Empty;
     public string ClientEmail { get; set; } = string.Empty;
     public CaseStatus Status { get; set; } = CaseStatus.Active;
-    public string AssignedLawyer { get; set; } = string.Empty;
+    public string AssignedOwner { get; set; } = string.Empty;
     public DateTime OpenedDate { get; set; }
     public DateTime? LastActivityDate { get; set; }
     public string SharePointSiteId { get; set; } = string.Empty;

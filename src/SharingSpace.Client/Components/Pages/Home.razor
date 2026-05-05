@@ -1,17 +1,17 @@
 @page "/"
 @layout SharingSpace.Client.Components.Layout.MainLayout
 
-<PageTitle>Secure Legal Portal</PageTitle>
+<PageTitle>Sharing Space – Secure Document Sharing</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center"
              VerticalAlignment="VerticalAlignment.Center" Style="min-height:60vh;text-align:center" Gap="24">
 
     <FluentIcon Value="@(new Icons.Regular.Size24.ShieldLock())" Color="Color.Accent" />
 
-    <FluentLabel Typo="Typography.H4">Welcome to the Secure Legal Portal</FluentLabel>
+    <FluentLabel Typo="Typography.H4">Securely share documents with clients and partners</FluentLabel>
 
     <FluentLabel Color="Color.Neutral" Style="max-width:480px">
-        Your files are stored securely inside your firm's Microsoft SharePoint environment.
+        Your files are stored securely inside your organisation's Microsoft SharePoint workspace.
         Sign in with your Microsoft account or use the one-time passcode sent to your email.
     </FluentLabel>
 
@@ -23,7 +23,7 @@
                         <FluentButton Appearance="Appearance.Accent"
                                       OnClick="@(() => Nav.NavigateTo("/lawyer"))">
                             <FluentIcon Value="@(new Icons.Regular.Size20.Briefcase())" />
-                            &nbsp;View Active Cases
+                            &nbsp;View Workspaces
                         </FluentButton>
                     </Authorized>
                 </AuthorizeView>
@@ -53,11 +53,11 @@
                      Title="Secure by Design"
                      Description="Files stay in your Microsoft 365 tenant. Nothing leaves SharePoint." />
         <FeatureTile Icon="@(new Icons.Regular.Size24.Globe())"
-                     Title="External Client Access"
-                     Description="Clients sign in with Gmail or any email via one-time passcode – no Microsoft licence required." />
+                     Title="Identity-Agnostic Access"
+                     Description="Collaborators sign in with Gmail or any email via one-time passcode – no Microsoft licence required." />
         <FeatureTile Icon="@(new Icons.Regular.Size24.CheckmarkCircle())"
                      Title="GDPR Compliant"
-                     Description="Data residency is maintained inside the firm's own tenant." />
+                     Description="Data residency is maintained inside your organisation's own tenant." />
     </FluentStack>
 
 </FluentStack>
@@ -65,6 +65,3 @@
 @code {
     [Inject] NavigationManager Nav { get; set; } = default!;
 }
-
-@* Inline sub-component for feature tiles *@
-@* Extracted here for brevity – can be moved to Components/Shared in larger projects *@

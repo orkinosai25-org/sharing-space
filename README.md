@@ -1,10 +1,13 @@
-# Sharing Space – Secure Legal Client Portal
+# Sharing Space – Secure External Document Sharing
 
-A **Productised Service** built on top of Microsoft SharePoint and the Microsoft Graph API.
-Designed to give law firms a branded, secure client portal **without migrating away from
-the Microsoft 365 they already pay for**.
+A **B2B SaaS platform** built on top of Microsoft SharePoint and the Microsoft Graph API.
+Designed to let companies, clients, and collaborators **securely share documents and workspaces
+with external users** — without SharePoint complexity, guest-tenant friction, or additional
+Microsoft licences for external parties.
 
 Built with **Blazor Server** (.NET 8) and **Microsoft Fluent UI (Office UI Fabric)**.
+
+> **"Securely share documents with clients and partners — without SharePoint complexity."**
 
 ---
 
@@ -14,25 +17,25 @@ Built with **Blazor Server** (.NET 8) and **Microsoft Fluent UI (Office UI Fabri
 ┌──────────────────────────────────────────────────────────┐
 │  Blazor Server (.NET 8)  –  Office UI Fabric Fluent UI   │
 │                                                          │
-│  Lawyer Dashboard        Client Dashboard                │
-│  ┌─ Active Cases ─┐      ┌─ My Documents ─┐             │
-│  │  CaseCard grid │      │  Document list  │             │
-│  └────────────────┘      └─────────────────┘             │
+│  Owner Dashboard         Collaborator Dashboard          │
+│  ┌─ Workspaces ──┐       ┌─ My Documents ─┐             │
+│  │  WorkspaceCard│       │  Document list  │             │
+│  └───────────────┘       └─────────────────┘             │
 │                                                          │
-│  CaseDetail page: upload files, share secure links       │
+│  Workspace detail: upload files, share secure links      │
 └───────────────────────┬──────────────────────────────────┘
                         │  Microsoft Graph API (HTTPS)
                         ▼
 ┌──────────────────────────────────────────────────────────┐
-│  Microsoft 365 Tenant                                    │
+│  Any Microsoft 365 Tenant  (Multi-tenant SaaS)           │
 │                                                          │
 │  Azure AD / Entra ID          SharePoint Online          │
 │  ┌─ App Registration ─┐      ┌─ Document Libraries ─┐   │
-│  │  Client Credentials│      │  One library per case │   │
-│  │  Sites.ReadWrite   │ ───▶ │  Metadata columns:    │   │
-│  │  Files.ReadWrite   │      │  CaseNumber, Client   │   │
-│  └────────────────────┘      │  Email, Status        │   │
-│                              └───────────────────────┘   │
+│  │  Multi-Tenant       │      │  One library per      │   │
+│  │  Client Credentials│ ───▶ │  workspace/project    │   │
+│  │  Sites.ReadWrite   │      │  Metadata: owner,     │   │
+│  │  Files.ReadWrite   │      │  collaborator email   │   │
+│  └────────────────────┘      └───────────────────────┘   │
 │  Entra B2B Guest Access                                  │
 │  ┌─ External users ──────────────────────────────────┐   │
 │  │  Microsoft accounts  →  sign in with credentials  │   │
@@ -47,12 +50,13 @@ Built with **Blazor Server** (.NET 8) and **Microsoft Fluent UI (Office UI Fabri
 |---------|----------|
 | UI framework | Blazor Server + Microsoft Fluent UI (Office UI Fabric) |
 | Authentication | Microsoft Identity Web (OIDC) + Entra B2B guest invitations |
-| File storage | SharePoint Document Libraries (one per case) |
+| Multi-tenancy | Single app registration; Graph clients scoped per `tid` JWT claim |
+| File storage | SharePoint Document Libraries (one per workspace/project) |
 | API | Microsoft Graph v1.0 via the official .NET SDK |
 | Incremental sync | Graph **delta queries** – only fetches changes since last sync |
-| External clients | Email OTP (no Microsoft licence required) or existing Microsoft account |
+| External access | Email OTP (no Microsoft licence required) or existing Microsoft/Google account |
 | Security | Least-privilege sharing links, 30-day expiry, sensitivity label ready |
-| GDPR | Files never leave the firm's own Microsoft 365 tenant |
+| GDPR | Files never leave the customer organisation's own Microsoft 365 tenant |
 
 ---
 
