@@ -18,11 +18,15 @@ builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 builder.Services.AddControllersWithViews().AddMicrosoftIdentityUI();
 
-// ── Microsoft Graph – app-only (client-credentials) for server-side calls ───
-builder.Services.AddSingleton(sp =>
+// ── Microsoft Graph – per-tenant app-only (client-credentials) factory ───────
+// Registered as a singleton Func so that GraphService (scoped, per Blazor circuit)
+// can obtain a GraphServiceClient for the current user's tenant at call time.
+// Each call to the factory creates a credential bound to the given tenant ID,
+// allowing a single app registration to serve every onboarded law firm.
+builder.Services.AddSingleton<Func<string, GraphServiceClient>>(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
-    return SharingSpace.Client.Services.GraphClientFactory.Create(config);
+    return tenantId => SharingSpace.Client.Services.GraphClientFactory.CreateForTenant(tenantId, config);
 });
 
 builder.Services.AddScoped<GraphService>();

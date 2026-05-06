@@ -4,8 +4,8 @@
 <FluentLayout>
     <FluentHeader>
         <FluentStack HorizontalAlignment="HorizontalAlignment.Start" VerticalAlignment="VerticalAlignment.Center" Gap="12">
-            <img src="/images/firm-logo.svg" alt="@firmName logo" height="32" style="display:block" />
-            <FluentLabel Typo="Typography.H6" Color="Color.Fill">@firmName – Secure Legal Portal</FluentLabel>
+            <img src="/images/firm-logo.svg" alt="@orgName logo" height="32" style="display:block" />
+            <FluentLabel Typo="Typography.H6" Color="Color.Fill">@orgName – Sharing Space</FluentLabel>
         </FluentStack>
         <FluentSpacer />
         <AuthorizeView>
@@ -32,7 +32,7 @@
 
     <FluentFooter>
         <FluentLabel Color="Color.Disabled">
-            &copy; @DateTime.Now.Year @firmName. Files stored securely in Microsoft SharePoint.
+            &copy; @DateTime.Now.Year @orgName. Files stored securely in Microsoft SharePoint.
         </FluentLabel>
     </FluentFooter>
 </FluentLayout>
@@ -49,10 +49,10 @@
 <FluentTooltipProvider />
 
 @code {
-    private string firmName = string.Empty;
+    private string orgName = string.Empty;
 
     protected override void OnInitialized()
     {
-        firmName = Config["Portal:FirmName"] ?? "Law Firm LLP";
+        orgName = Config["Portal:FirmName"] ?? "Sharing Space";
     }
 }
