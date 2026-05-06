@@ -41,7 +41,7 @@ public class Workspace
 
     public WorkspaceStatus Status { get; set; } = WorkspaceStatus.Active;
 
-    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedDate { get; set; }
 
     public DateTime? LastActivityDate { get; set; }
 

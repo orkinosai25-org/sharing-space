@@ -184,7 +184,7 @@ public class GraphService
             OwnerEmail      = ownerEmail,
             OwnerDisplayName = ownerDisplayName,
             Status          = WorkspaceStatus.Active,
-            CreatedDate     = DateTime.UtcNow,
+            CreatedDate     = newList.CreatedDateTime?.UtcDateTime ?? DateTime.UtcNow,
             SharePointListId = newList.Id,
             DriveId         = drive?.Id ?? string.Empty,
             WebUrl          = drive?.WebUrl ?? string.Empty
@@ -428,12 +428,13 @@ public class GraphService
 
     // ─── Private helpers ─────────────────────────────────────────────────────
 
-    private static Workspace MapDriveToWorkspace(Drive drive) => new()
+    private Workspace MapDriveToWorkspace(Drive drive) => new()
     {
         Id               = drive.Id ?? string.Empty,
         DriveId          = drive.Id ?? string.Empty,
         Name             = drive.Name ?? "Untitled Workspace",
         Description      = drive.Description ?? string.Empty,
+        TenantId         = _tenantId ?? string.Empty,
         CreatedDate      = drive.CreatedDateTime?.UtcDateTime ?? DateTime.UtcNow,
         LastActivityDate = drive.LastModifiedDateTime?.UtcDateTime,
         WebUrl           = drive.WebUrl ?? string.Empty,
