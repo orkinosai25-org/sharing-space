@@ -1,0 +1,205 @@
+@page "/workspace/create"
+@attribute [Authorize(Roles = "Lawyer")]
+@layout SharingSpace.Client.Components.Layout.MainLayout
+@inject GraphService Graph
+@inject NavigationManager Nav
+@inject IToastService Toast
+@inject AuthenticationStateProvider AuthState
+
+<PageTitle>Create Workspace – Sharing Space</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" Gap="24" Style="max-width:640px;margin:0 auto">
+
+    @* ── Page header ──────────────────────────────────────────────────────── *@
+    <FluentStack Orientation="Orientation.Vertical" Gap="6">
+        <FluentLabel Typo="Typography.H4">
+            <FluentIcon Value="@(new Icons.Regular.Size24.Add())" Color="Color.Accent" />
+            &nbsp;Create Workspace
+        </FluentLabel>
+        <FluentLabel Color="Color.Neutral">
+            A workspace provisions a new SharePoint Document Library in your organisation's
+            Microsoft 365 tenant.  It is isolated to your tenant and assigned to a single
+            responsible owner.
+        </FluentLabel>
+    </FluentStack>
+
+    @* ── Success banner ───────────────────────────────────────────────────── *@
+    @if (_created is not null)
+    {
+        <FluentMessageBar Intent="MessageIntent.Success">
+            <FluentStack Orientation="Orientation.Vertical" Gap="8">
+                <span>
+                    Workspace <b>@_created.Name</b> was created successfully in tenant
+                    <code>@_created.TenantId</code>.
+                </span>
+                @if (!string.IsNullOrEmpty(_created.WebUrl))
+                {
+                    <FluentAnchor Href="@_created.WebUrl" Target="_blank">
+                        <FluentIcon Value="@(new Icons.Regular.Size16.Open())" />
+                        &nbsp;Open in SharePoint
+                    </FluentAnchor>
+                }
+                <FluentButton Appearance="Appearance.Lightweight"
+                              OnClick="@(() => Nav.NavigateTo("/lawyer"))">
+                    Back to Workspaces
+                </FluentButton>
+            </FluentStack>
+        </FluentMessageBar>
+    }
+
+    @* ── Creation form ────────────────────────────────────────────────────── *@
+    @if (_created is null)
+    {
+        <FluentCard Style="padding:28px">
+            <FluentStack Orientation="Orientation.Vertical" Gap="20">
+
+                @* Workspace name *@
+                <FluentTextField @bind-Value="_name"
+                                 Label="Workspace name *"
+                                 Placeholder="e.g. Smith v Jones 2025"
+                                 Style="width:100%"
+                                 Required="true"
+                                 Disabled="@_submitting" />
+
+                @* Description *@
+                <FluentTextArea @bind-Value="_description"
+                                Label="Description"
+                                Placeholder="Optional: brief context about this workspace"
+                                Style="width:100%;resize:vertical"
+                                Rows="3"
+                                Disabled="@_submitting" />
+
+                @* Owner *@
+                <FluentStack Orientation="Orientation.Vertical" Gap="4">
+                    <FluentTextField @bind-Value="_ownerEmail"
+                                     Label="Owner email *"
+                                     Placeholder="lawyer@example.com"
+                                     Style="width:100%"
+                                     Required="true"
+                                     Disabled="@_submitting" />
+                    <FluentLabel Color="Color.Neutral" Style="font-size:12px">
+                        The owner is the lawyer responsible for this workspace.
+                        Defaults to your signed-in account.
+                    </FluentLabel>
+                </FluentStack>
+
+                <FluentTextField @bind-Value="_ownerDisplayName"
+                                 Label="Owner display name"
+                                 Placeholder="Jane Smith"
+                                 Style="width:100%"
+                                 Disabled="@_submitting" />
+
+                @* Tenant info (read-only) *@
+                <FluentStack Orientation="Orientation.Vertical" Gap="4">
+                    <FluentLabel Style="font-weight:600;font-size:14px">Tenant</FluentLabel>
+                    <FluentLabel Color="Color.Neutral" Style="font-size:13px">
+                        <FluentIcon Value="@(new Icons.Regular.Size16.Building())" />
+                        &nbsp;@(_tenantId ?? "Resolving…")
+                    </FluentLabel>
+                    <FluentLabel Color="Color.Neutral" Style="font-size:12px">
+                        The workspace will be isolated to this Microsoft Entra ID tenant.
+                    </FluentLabel>
+                </FluentStack>
+
+                @* Validation message *@
+                @if (_validationError is not null)
+                {
+                    <FluentMessageBar Intent="MessageIntent.Error">
+                        @_validationError
+                    </FluentMessageBar>
+                }
+
+                @* Submit *@
+                <FluentStack Gap="12" HorizontalAlignment="HorizontalAlignment.Right">
+                    <FluentButton Appearance="Appearance.Neutral"
+                                  OnClick="@(() => Nav.NavigateTo("/lawyer"))"
+                                  Disabled="@_submitting">
+                        Cancel
+                    </FluentButton>
+                    <FluentButton Appearance="Appearance.Accent"
+                                  OnClick="SubmitAsync"
+                                  Disabled="@_submitting">
+                        @if (_submitting)
+                        {
+                            <FluentProgressRing Style="width:16px;height:16px" />
+                            <span>&nbsp;Creating…</span>
+                        }
+                        else
+                        {
+                            <FluentIcon Value="@(new Icons.Regular.Size16.Add())" />
+                            <span>&nbsp;Create Workspace</span>
+                        }
+                    </FluentButton>
+                </FluentStack>
+
+            </FluentStack>
+        </FluentCard>
+    }
+
+</FluentStack>
+
+@code {
+    private string _name            = string.Empty;
+    private string _description     = string.Empty;
+    private string _ownerEmail      = string.Empty;
+    private string _ownerDisplayName = string.Empty;
+    private string? _tenantId;
+    private string? _validationError;
+    private bool _submitting;
+    private Workspace? _created;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Pre-fill owner with the currently signed-in user
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        var user = auth.User;
+
+        _ownerEmail       = user.FindFirst("preferred_username")?.Value
+                         ?? user.FindFirst("email")?.Value
+                         ?? user.Identity?.Name
+                         ?? string.Empty;
+
+        _ownerDisplayName = user.FindFirst("name")?.Value ?? string.Empty;
+
+        _tenantId = user.FindFirst("tid")?.Value
+                 ?? user.FindFirst("http://schemas.microsoft.com/identity/claims/tenantid")?.Value;
+    }
+
+    private async Task SubmitAsync()
+    {
+        _validationError = null;
+
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _validationError = "Workspace name is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_ownerEmail))
+        {
+            _validationError = "Owner email is required.";
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            _created = await Graph.CreateWorkspaceAsync(
+                _name.Trim(),
+                _description.Trim(),
+                _ownerEmail.Trim(),
+                _ownerDisplayName.Trim());
+
+            Toast.ShowSuccess($"Workspace '{_created.Name}' created successfully.");
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Could not create workspace: {ex.Message}");
+            _validationError = ex.Message;
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}
