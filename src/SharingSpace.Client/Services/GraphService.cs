@@ -79,6 +79,118 @@ public class GraphService
         return _clientFactory(_tenantId);
     }
 
+    // ─── Workspaces ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Lists all workspaces in the configured SharePoint site by reading
+    /// every Drive (Document Library).  The current user's tenant ID is
+    /// embedded in each returned <see cref="Workspace"/> so callers can
+    /// filter or group by tenant without additional Graph calls.
+    /// </summary>
+    public async Task<IReadOnlyList<Workspace>> GetWorkspacesAsync(CancellationToken ct = default)
+    {
+        var siteId = _config["SharePoint:SiteId"]
+            ?? throw new InvalidOperationException("SharePoint:SiteId is not configured.");
+
+        _logger.LogInformation("Fetching workspaces from SharePoint site {SiteId}", siteId);
+
+        var client = await GetClientAsync();
+        var drives = await client.Sites[siteId].Drives
+            .GetAsync(req => req.QueryParameters.Select = new[]
+            {
+                "id", "name", "description", "createdDateTime", "lastModifiedDateTime", "webUrl"
+            }, ct)
+            .ConfigureAwait(false);
+
+        var workspaces = new List<Workspace>();
+
+        foreach (var drive in drives?.Value ?? [])
+        {
+            if (drive.Id is null) continue;
+
+            var ws = MapDriveToWorkspace(drive);
+            ws.DocumentCount = await CountItemsInRootAsync(drive.Id, ct);
+            workspaces.Add(ws);
+        }
+
+        return workspaces;
+    }
+
+    /// <summary>
+    /// Provisions a new SharePoint Document Library under the configured site,
+    /// creating an isolated workspace for the specified owner.
+    ///
+    /// The new library is created using the <c>documentLibrary</c> list template
+    /// via the Graph <c>/sites/{id}/lists</c> endpoint.  The associated Drive
+    /// (needed for subsequent file operations) is fetched immediately after
+    /// creation and stored in <see cref="Workspace.DriveId"/>.
+    /// </summary>
+    /// <param name="name">Display name of the new workspace (also becomes the SharePoint library name).</param>
+    /// <param name="description">Optional description shown in SharePoint.</param>
+    /// <param name="ownerEmail">Email address of the lawyer / admin assigned as owner.</param>
+    /// <param name="ownerDisplayName">Display name shown in the portal for the owner.</param>
+    public async Task<Workspace> CreateWorkspaceAsync(
+        string name,
+        string description,
+        string ownerEmail,
+        string ownerDisplayName = "",
+        CancellationToken ct = default)
+    {
+        var siteId = _config["SharePoint:SiteId"]
+            ?? throw new InvalidOperationException("SharePoint:SiteId is not configured.");
+
+        _logger.LogInformation(
+            "Creating workspace '{Name}' on site {SiteId}", Sanitize(name), siteId);
+
+        var client = await GetClientAsync();
+
+        // Create a SharePoint Document Library via /sites/{siteId}/lists
+        var newList = await client.Sites[siteId].Lists.PostAsync(
+            new Microsoft.Graph.Models.List
+            {
+                DisplayName = name,
+                Description = description,
+                ListProp = new Microsoft.Graph.Models.ListInfo
+                {
+                    Template = "documentLibrary"
+                }
+            }, cancellationToken: ct)
+            .ConfigureAwait(false);
+
+        if (newList?.Id is null)
+            throw new InvalidOperationException(
+                "SharePoint did not return a list ID for the newly created workspace.");
+
+        // Retrieve the associated Drive so that file operations can use DriveId
+        Microsoft.Graph.Models.Drive? drive = null;
+        try
+        {
+            drive = await client.Sites[siteId].Lists[newList.Id].Drive
+                .GetAsync(cancellationToken: ct)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Could not retrieve drive for newly created list {ListId}", newList.Id);
+        }
+
+        return new Workspace
+        {
+            Id              = newList.Id,
+            Name            = name,
+            Description     = description,
+            TenantId        = _tenantId ?? string.Empty,
+            OwnerEmail      = ownerEmail,
+            OwnerDisplayName = ownerDisplayName,
+            Status          = WorkspaceStatus.Active,
+            CreatedDate     = newList.CreatedDateTime?.UtcDateTime ?? DateTime.UtcNow,
+            SharePointListId = newList.Id,
+            DriveId         = drive?.Id ?? string.Empty,
+            WebUrl          = drive?.WebUrl ?? string.Empty
+        };
+    }
+
     // ─── Cases ───────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -315,6 +427,19 @@ public class GraphService
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────
+
+    private Workspace MapDriveToWorkspace(Drive drive) => new()
+    {
+        Id               = drive.Id ?? string.Empty,
+        DriveId          = drive.Id ?? string.Empty,
+        Name             = drive.Name ?? "Untitled Workspace",
+        Description      = drive.Description ?? string.Empty,
+        TenantId         = _tenantId ?? string.Empty,
+        CreatedDate      = drive.CreatedDateTime?.UtcDateTime ?? DateTime.UtcNow,
+        LastActivityDate = drive.LastModifiedDateTime?.UtcDateTime,
+        WebUrl           = drive.WebUrl ?? string.Empty,
+        Status           = WorkspaceStatus.Active
+    };
 
     private static Case MapDriveToCase(Drive drive) => new()
     {
