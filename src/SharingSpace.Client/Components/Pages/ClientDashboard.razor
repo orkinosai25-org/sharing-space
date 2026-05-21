@@ -55,7 +55,8 @@
 
                     <DocumentList Documents="@GetDocumentsForCase(c.DriveId)"
                                   IsLoading="@IsLoadingDocs(c.DriveId)"
-                                  AllowShare="false" />
+                                  AllowShare="false"
+                                  OnPreviewRequested="PreviewDocumentAsync" />
                 </FluentStack>
             </FluentCard>
         }
@@ -63,12 +64,21 @@
 
 </FluentStack>
 
+@* ── Preview dialog ──────────────────────────────────────────────────────── *@
+<DocumentPreviewDialog Document="@_previewDoc"
+                       Hidden="@(!_showPreview)"
+                       OnClose="ClosePreview" />
+
 @code {
     private string _clientEmail = string.Empty;
     private List<Case> _cases = [];
     private Dictionary<string, IReadOnlyList<CaseDocument>> _documentsByDrive = new();
     private HashSet<string> _loadingDrives = new();
     private bool _loading = true;
+
+    // Preview state
+    private CaseDocument? _previewDoc;
+    private bool _showPreview;
 
     protected override async Task OnInitializedAsync()
     {
@@ -113,4 +123,19 @@
         _documentsByDrive.TryGetValue(driveId, out var docs) ? docs : [];
 
     private bool IsLoadingDocs(string driveId) => _loadingDrives.Contains(driveId);
+
+    // ── Preview ────────────────────────────────────────────────────────────
+
+    private Task PreviewDocumentAsync(CaseDocument doc)
+    {
+        _previewDoc = doc;
+        _showPreview = true;
+        return Task.CompletedTask;
+    }
+
+    private void ClosePreview()
+    {
+        _showPreview = false;
+        _previewDoc = null;
+    }
 }

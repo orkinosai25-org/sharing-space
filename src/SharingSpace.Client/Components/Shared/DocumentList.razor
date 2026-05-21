@@ -26,6 +26,11 @@
                 <FluentStack Gap="4">
                     @if (!string.IsNullOrEmpty(context.DownloadUrl))
                     {
+                        <FluentButton Appearance="Appearance.Lightweight"
+                                      Title="Preview"
+                                      OnClick="@(() => OnPreviewRequested.InvokeAsync(context))">
+                            <FluentIcon Value="@(new Icons.Regular.Size16.Eye())" />
+                        </FluentButton>
                         <FluentAnchor Href="@context.DownloadUrl"
                                       Target="_blank"
                                       Appearance="Appearance.Lightweight"
@@ -59,4 +64,5 @@
     [Parameter] public bool IsLoading { get; set; }
     [Parameter] public bool AllowShare { get; set; }
     [Parameter] public EventCallback<CaseDocument> OnShareRequested { get; set; }
+    [Parameter] public EventCallback<CaseDocument> OnPreviewRequested { get; set; }
 }
