@@ -88,7 +88,8 @@ else
                 <DocumentList Documents="@_documents"
                               IsLoading="@_loadingDocs"
                               AllowShare="true"
-                              OnShareRequested="ShareDocumentAsync" />
+                              OnShareRequested="ShareDocumentAsync"
+                              OnPreviewRequested="PreviewDocumentAsync" />
 
             </FluentStack>
         </FluentCard>
@@ -126,6 +127,11 @@ else
         <FluentButton Appearance="Appearance.Neutral" OnClick="CloseUpload" Disabled="@_uploading">Cancel</FluentButton>
     </FluentDialogFooter>
 </FluentDialog>
+
+@* ── Preview dialog ──────────────────────────────────────────────────────── *@
+<DocumentPreviewDialog Document="@_previewDoc"
+                       Hidden="@(!_showPreview)"
+                       OnClose="ClosePreview" />
 
 @* ── Share dialog ────────────────────────────────────────────────────────── *@
 <FluentDialog @ref="_shareDialog" Hidden="@(!_showShare)" Modal="true" TrapFocus="true"
@@ -180,6 +186,10 @@ else
     private string _shareEmail = string.Empty;
     private string? _generatedLink;
     private bool _sharing;
+
+    // Preview state
+    private CaseDocument? _previewDoc;
+    private bool _showPreview;
 
     // Delta sync
     private DateTime? _lastDeltaSync;
@@ -269,6 +279,21 @@ else
         }
         catch (Exception ex) { Toast.ShowError($"Upload failed: {ex.Message}"); }
         finally { CloseUpload(); }
+    }
+
+    // ── Preview ────────────────────────────────────────────────────────────
+
+    private Task PreviewDocumentAsync(CaseDocument doc)
+    {
+        _previewDoc = doc;
+        _showPreview = true;
+        return Task.CompletedTask;
+    }
+
+    private void ClosePreview()
+    {
+        _showPreview = false;
+        _previewDoc = null;
     }
 
     // ── Share ──────────────────────────────────────────────────────────────
